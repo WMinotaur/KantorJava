@@ -20,6 +20,9 @@ dependencies {
     testImplementation libs.junit
     implementation 'org.apache.logging.log4j:log4j-api:2.25.0'
     implementation 'org.apache.logging.log4j:log4j-core:2.25.0'
+    implementation 'org.json:json:20240303'
+    implementation 'log4j:log4j:1.2.17'
+    implementation 'org.jfree:jfreechart:1.5.4'
 
     // This dependency is used by the application.
     implementation libs.guava
@@ -28,7 +31,7 @@ dependencies {
 // Apply a specific Java toolchain to ease working on different environments.
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(24)
+        languageVersion = JavaLanguageVersion.of(17)
     }
 }
 
