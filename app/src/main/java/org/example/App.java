@@ -57,9 +57,8 @@ public class App {
             JButton drawDiagramButton = new JButton("Narysuj wykresy kursów");
             topPanel.add(drawDiagramButton);
 
-            JTextArea textArea = new JTextArea();
-            textArea.setEditable(false);
-            JScrollPane scrollPane = new JScrollPane(textArea);
+            JPanel dynamicPanel = new JPanel(new BorderLayout());
+            JScrollPane scrollPane = null; // niepotrzebny, tylko placeholder
 
             JPanel bottomPanel = new JPanel();
             JLabel StatusLabel = new JLabel("Ready...");
@@ -83,16 +82,14 @@ public class App {
 
             JPanel middlePanel = new JPanel();
             middlePanel.setLayout(new BorderLayout());
-            middlePanel.add(scrollPane, BorderLayout.CENTER);
+
+            middlePanel.add(dynamicPanel, BorderLayout.CENTER);
             middlePanel.add(converterPanel, BorderLayout.SOUTH);
             middlePanel.add(chartPanelContainer, BorderLayout.NORTH);
             middlePanel.setVisible(true);
 
             panel.add(topPanel, BorderLayout.NORTH);
             panel.add(middlePanel, BorderLayout.CENTER);
-            // panel.add(converterPanel, BorderLayout.CENTER); // teraz tu panel z boxami
-            // panel.add(scrollPane, BorderLayout.WEST);
-            // panel.add(chartPanelContainer, BorderLayout.SOUTH);
             panel.add(bottomPanel, BorderLayout.SOUTH);
 
             frame.add(panel);
@@ -109,20 +106,19 @@ public class App {
                     if (nbpCurrencyComboBox1.getItemCount() == 0) {
                         fetchNBPCurrencies(nbpCurrencyComboBox1, StatusLabel, nbpCurrencyComboBox2);
                     }
-                    scrollPane.setVisible(false);
+                    dynamicPanel.setVisible(false);
                     chartPanelContainer.setVisible(true);
                 } else {
-                    scrollPane.setVisible(true);
+                    dynamicPanel.setVisible(true);
                     chartPanelContainer.setVisible(false);
                     converterPanel.setVisible(false);
-                    fetchExchangeRates(selected, textArea, StatusLabel);
+                    fetchExchangeRates(selected, dynamicPanel, StatusLabel); 
                 }
                 chartPanelContainer.removeAll();
                 chartPanelContainer.revalidate();
                 chartPanelContainer.repaint();
             });
 
-            // przeładowanie drugiego combo po zmianie pierwszego
             nbpCurrencyComboBox1.addActionListener(e -> {
                 if (nbpCurrencyComboBox2.isVisible() && nbpCurrencyComboBox1.getItemCount() > 0) {
                     String chosen = (String)nbpCurrencyComboBox1.getSelectedItem();
@@ -149,7 +145,7 @@ public class App {
                     }
                     fetchAndShowNBPCharts(currencyCode1, currencyCode2, chartPanelContainer, StatusLabel);
                 } else {
-                    fetchExchangeRates(dataSource, textArea, StatusLabel);
+                    fetchExchangeRates(dataSource, dynamicPanel, StatusLabel); 
                     chartPanelContainer.removeAll();
                     chartPanelContainer.revalidate();
                     chartPanelContainer.repaint();
@@ -186,18 +182,16 @@ public class App {
             frame.setVisible(true);
         });
     }
+
     private static void initiateWindow(JFrame frame, JPanel topPanel,JComboBox<String> dataSourceComboBox, JComboBox<String> nbpCurrencyComboBox1,
                                         JComboBox<String> nbpCurrencyComboBox2, JPanel chartPanelContainer, JLabel StatusLabel) {
-        // Ustawienia okna
         frame.setTitle("Kantor - aplikacja do przeliczania walut");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         frame.setSize(1400, 900);
         frame.setLocationRelativeTo(null);
-        
          for (ActionListener al: dataSourceComboBox.getActionListeners()) {
             al.actionPerformed(new ActionEvent(dataSourceComboBox, ActionEvent.ACTION_PERFORMED, null));
         }
-
     }
 
     private static void fetchNBPCurrencies(JComboBox<String> nbpCurrencyComboBox1, JLabel StatusLabel, JComboBox<String> nbpCurrencyComboBox2) {
@@ -229,7 +223,6 @@ public class App {
                         nbpRates.put(currency, code);
                         nbpCurrencyComboBox1.addItem(currency);
                     }
-                    // Ustaw od razu drugi ComboBox
                     nbpCurrencyComboBox2.removeAllItems();
                     String chosen = (String)nbpCurrencyComboBox1.getSelectedItem();
                     for (int i = 0; i < nbpCurrencyComboBox1.getItemCount(); i++) {
@@ -370,10 +363,8 @@ public class App {
         }
     }
 
-    private static void fetchExchangeRates(String dataSource, JTextArea textArea, JLabel statusLabel) {
-        Cursor oldCursor = textArea.getCursor();
+    private static void fetchExchangeRates(String dataSource, JPanel dynamicPanel, JLabel statusLabel) {
         try {
-            textArea.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
             URL url;
             switch (dataSource) {
                 case "NBP":
@@ -386,7 +377,7 @@ public class App {
                     url = new URL("https://openexchangerates.org/api/latest.json?app_id=9ce7f33638c547369cbf171d54d9d84e");
                     break;
                 default:
-                    textArea.setText("Unknown data source selected.");
+                    showTextInPanel("Unknown data source selected.", dynamicPanel);
                     return;
             }
 
@@ -404,79 +395,91 @@ public class App {
                 }
                 in.close();
 
-                String result;
                 switch (dataSource) {
                     case "NBP":
-                        result = parseNBPResponse(content.toString());
+                        showTextInPanel(parseNBPResponse(content.toString()), dynamicPanel);
                         break;
                     case "ExchangeRate API":
-                        result = parseExchangeRateAPIResponse(content.toString());
+                        showRatesTable(parseExchangeRateAPIObject(content.toString()), dynamicPanel, "ExchangeRate API Exchange Rates:");
                         break;
                     case "Open Exchange Rates":
-                        result = parseOpenExchangeRatesResponse(content.toString());
+                        showRatesTable(parseOpenExchangeRatesObject(content.toString()), dynamicPanel, "Open Exchange Rates:");
                         break;
                     default:
-                        result = "Unknown data source.";
+                        showTextInPanel("Unknown data source.", dynamicPanel);
                 }
-                textArea.setText(result);
                 statusLabel.setText("Kursy pobrane z " + dataSource + ".");
                 logger.info("Kursy pobrane z " + dataSource);
             } else {
                 String errorMessage = "Błąd: " + con.getResponseCode() + " " + con.getResponseMessage();
-                textArea.setText(errorMessage);
+                showTextInPanel(errorMessage, dynamicPanel);
                 logger.error(errorMessage);
                 statusLabel.setText("Błąd pobierania kursów: " + con.getResponseCode() + " " + con.getResponseMessage());
             }
         } catch (Exception e) {
             String errorMessage = "Błąd podczas pobierania kursów : " + e.getMessage();
-            textArea.setText(errorMessage);
+            showTextInPanel(errorMessage, dynamicPanel);
             logger.error(errorMessage, e);
         }
-        finally {
-            textArea.setCaretPosition(0); // Przewiń do góry
-            textArea.setCursor(oldCursor);
-        }
+    }
 
+    private static void showTextInPanel(String text, JPanel panel) {
+        panel.removeAll();
+        JTextArea textArea = new JTextArea(text);
+        textArea.setEditable(false);
+        panel.add(new JScrollPane(textArea), BorderLayout.CENTER);
+        panel.revalidate();
+        panel.repaint();
+    }
+
+    private static void showRatesTable(JSONObject rates, JPanel panel, String title) {
+        java.util.List<String> keys = new ArrayList<>();
+        for (String key : rates.keySet()) {
+            keys.add(key);
+        }
+        Collections.sort(keys);
+
+        String[] columnNames = { "Waluta", "Kurs" };
+        String[][] data = new String[keys.size()][2];
+        for (int i = 0; i < keys.size(); i++) {
+            data[i][0] = keys.get(i);
+            data[i][1] = rates.get(keys.get(i)).toString();
+        }
+        JTable table = new JTable(data, columnNames);
+        table.setAutoCreateRowSorter(true);
+        JScrollPane scrollPane = new JScrollPane(table);
+
+        panel.removeAll();
+        JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        titlePanel.add(new JLabel(title));
+        panel.add(titlePanel, BorderLayout.NORTH);
+        panel.add(scrollPane, BorderLayout.CENTER);
+        panel.revalidate();
+        panel.repaint();
     }
 
     private static String parseNBPResponse(String jsonResponse) {
         StringBuilder result = new StringBuilder("NBP Exchange Rates:\n");
-        // niepotrzebne w tym widoku, ale zostawione
         return result.toString();
     }
 
-    private static String parseExchangeRateAPIResponse(String jsonResponse) {
-        StringBuilder result = new StringBuilder("ExchangeRate API Exchange Rates:\n");
+    private static JSONObject parseExchangeRateAPIObject(String jsonResponse) {
         try {
             JSONObject jsonObject = new JSONObject(jsonResponse);
-            JSONObject rates = jsonObject.getJSONObject("conversion_rates");
-
-            for (String key : rates.keySet()) {
-                result.append(String.format("%-15s %s\n", key, rates.get(key)));
-            }
+            return jsonObject.getJSONObject("conversion_rates");
         } catch (Exception e) {
-            result.append("Error parsing ExchangeRate API response: ").append(e.getMessage());
             logger.error("Error parsing ExchangeRate API response", e);
+            return new JSONObject();
         }
-
-        return result.toString();
     }
 
-    private static String parseOpenExchangeRatesResponse(String jsonResponse) {
-        StringBuilder result = new StringBuilder("Open Exchange Rates:\n");
-
+    private static JSONObject parseOpenExchangeRatesObject(String jsonResponse) {
         try {
             JSONObject jsonObject = new JSONObject(jsonResponse);
-            JSONObject rates = jsonObject.getJSONObject("rates");
-
-            for (String key : rates.keySet()) {
-                result.append(String.format("%-15s %s\n", key, rates.get(key)));
-            }
+            return jsonObject.getJSONObject("rates");
         } catch (Exception e) {
-            result.append("Error parsing Open Exchange Rates response: ").append(e.getMessage());
             logger.error("Error parsing Open Exchange Rates response", e);
+            return new JSONObject();
         }
-
-        return result.toString();
     }
 }
