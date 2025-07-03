@@ -24,8 +24,14 @@ public class App {
     private static final Logger logger = Logger.getLogger(App.class);
 
     static {
-        String log4jConfigPath = "C:\\github\\KantorJava\\app\\src\\main\\resources\\log4j2.xml";
+         try {
+        String log4jConfigPath = "C:\\github\\KantorJava\\app\\src\\main\\resources\\log4j.xml";
         PropertyConfigurator.configure(log4jConfigPath);
+        logger.info("Log4j initialized successfully.");
+    } catch (Exception ex) {
+        logger.fatal("FATAL: Log4j configuration failed. Application will exit.", ex);
+        System.exit(1);
+    }
     }
 
     private static Map<String, String> nbpRates = new LinkedHashMap<>();
@@ -141,8 +147,16 @@ public class App {
                     String currencyCode2 = nbpRates.get(nbpCurrencyComboBox2.getSelectedItem().toString());
                     if (currencyCode1 == null) {
                         StatusLabel.setText("Nie wybrano waluty.");
+                        logger.warn("Użytkownik nie wybrał pierwszej waluty do wykresu.");
+
                         return;
                     }
+                    if (currencyCode2 == null) {
+                        StatusLabel.setText("Nie wybrano drugiej waluty.");
+                        logger.warn("Użytkownik nie wybrał drugiej waluty do wykresu.");
+                        return;
+                    }
+
                     fetchAndShowNBPCharts(currencyCode1, currencyCode2, chartPanelContainer, StatusLabel);
                 } else {
                     fetchExchangeRates(dataSource, dynamicPanel, StatusLabel); 
@@ -232,6 +246,11 @@ public class App {
                         }
                     }
                     StatusLabel.setText("Waluty NBP załadowane.");
+                    logger.info("Waluty NBP załadowane.");
+                    if (nbpRates.isEmpty()) {
+                        logger.fatal("Nie udało się załadować żadnej waluty z NBP. Krytyczny błąd.");
+                    }
+
                 } else {
                     StatusLabel.setText("Błąd pobierania walut NBP.");
                 }
