@@ -40,7 +40,7 @@ public class App {
             panel.setLayout(new BorderLayout());
 
             JPanel topPanel = new JPanel();
-            JLabel label = new JLabel("Select Data Source:");
+            JLabel label = new JLabel("Wybierz źródło danych:");
             String[] dataSources = {"NBP", "ExchangeRate API", "Open Exchange Rates"};
             JComboBox<String> dataSourceComboBox = new JComboBox<>(dataSources);
             topPanel.add(label);
@@ -54,8 +54,8 @@ public class App {
             nbpCurrencyComboBox2.setVisible(false);
             topPanel.add(nbpCurrencyComboBox2);
 
-            JButton fetchButton = new JButton("Fetch Exchange Rates");
-            topPanel.add(fetchButton);
+            JButton drawDiagramButton = new JButton("Narysuj wykresy kursów");
+            topPanel.add(drawDiagramButton);
 
             JTextArea textArea = new JTextArea();
             textArea.setEditable(false);
@@ -67,9 +67,10 @@ public class App {
 
             JPanel chartPanelContainer = new JPanel();
             chartPanelContainer.setLayout(new GridLayout(1, 2));
+            chartPanelContainer.setVisible(true);
 
             // Panel do przeliczania walut - nowa linia
-            JPanel converterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+            JPanel converterPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
             converterPanel.setVisible(false);
             JTextField amountField1 = new JTextField(10);
             JTextField amountField2 = new JTextField(10);
@@ -80,11 +81,19 @@ public class App {
             converterPanel.add(amountField2);
             converterPanel.add(convertButton);
 
+            JPanel middlePanel = new JPanel();
+            middlePanel.setLayout(new BorderLayout());
+            middlePanel.add(scrollPane, BorderLayout.CENTER);
+            middlePanel.add(converterPanel, BorderLayout.SOUTH);
+            middlePanel.add(chartPanelContainer, BorderLayout.NORTH);
+            middlePanel.setVisible(true);
+
             panel.add(topPanel, BorderLayout.NORTH);
-            panel.add(converterPanel, BorderLayout.CENTER); // teraz tu panel z boxami
-            panel.add(scrollPane, BorderLayout.WEST);
+            panel.add(middlePanel, BorderLayout.CENTER);
+            // panel.add(converterPanel, BorderLayout.CENTER); // teraz tu panel z boxami
+            // panel.add(scrollPane, BorderLayout.WEST);
+            // panel.add(chartPanelContainer, BorderLayout.SOUTH);
             panel.add(bottomPanel, BorderLayout.SOUTH);
-            panel.add(chartPanelContainer, BorderLayout.SOUTH);
 
             frame.add(panel);
 
@@ -94,6 +103,7 @@ public class App {
                 boolean isNBP = "NBP".equals(selected);
                 nbpCurrencyComboBox1.setVisible(isNBP);
                 nbpCurrencyComboBox2.setVisible(isNBP);
+                drawDiagramButton.setVisible(isNBP);
                 converterPanel.setVisible(isNBP);
                 if (isNBP) {
                     if (nbpCurrencyComboBox1.getItemCount() == 0) {
@@ -105,6 +115,7 @@ public class App {
                     scrollPane.setVisible(true);
                     chartPanelContainer.setVisible(false);
                     converterPanel.setVisible(false);
+                    fetchExchangeRates(selected, textArea, StatusLabel);
                 }
                 chartPanelContainer.removeAll();
                 chartPanelContainer.revalidate();
@@ -125,19 +136,20 @@ public class App {
                 }
             });
 
-            fetchButton.addActionListener(e -> {
+            drawDiagramButton.addActionListener(e -> {
                 String dataSource = (String) dataSourceComboBox.getSelectedItem();
                 if ("NBP".equals(dataSource)
                         && nbpCurrencyComboBox1.isVisible()
                         && nbpCurrencyComboBox1.getSelectedItem() != null) {
-                    String currencyCode = nbpRates.get(nbpCurrencyComboBox1.getSelectedItem().toString());
-                    if (currencyCode == null) {
+                    String currencyCode1 = nbpRates.get(nbpCurrencyComboBox1.getSelectedItem().toString());
+                    String currencyCode2 = nbpRates.get(nbpCurrencyComboBox2.getSelectedItem().toString());
+                    if (currencyCode1 == null) {
                         StatusLabel.setText("Nie wybrano waluty.");
                         return;
                     }
-                    fetchAndShowNBPCharts(currencyCode, chartPanelContainer, StatusLabel);
+                    fetchAndShowNBPCharts(currencyCode1, currencyCode2, chartPanelContainer, StatusLabel);
                 } else {
-                    fetchExchangeRates(dataSource, textArea);
+                    fetchExchangeRates(dataSource, textArea, StatusLabel);
                     chartPanelContainer.removeAll();
                     chartPanelContainer.revalidate();
                     chartPanelContainer.repaint();
@@ -153,9 +165,7 @@ public class App {
                 String from = nbpRates.get(nbpCurrencyComboBox1.getSelectedItem().toString());
                 String to = nbpRates.get(nbpCurrencyComboBox2.getSelectedItem().toString());
                 String text1 = amountField1.getText().replace(',', '.');
-                String text2 = amountField2.getText().replace(',', '.');
-                boolean calc1 = !text1.isEmpty() && (text2.isEmpty() || amountField1.hasFocus());
-                boolean calc2 = !text2.isEmpty() && (text1.isEmpty() || amountField2.hasFocus());
+                boolean calc1 = !text1.isEmpty();
                 try {
                     double fromRate = fetchNBPLatestRate(from);
                     double toRate = fetchNBPLatestRate(to);
@@ -163,22 +173,31 @@ public class App {
                         double val = Double.parseDouble(text1);
                         double result = val * fromRate / toRate;
                         amountField2.setText(String.format("%.4f", result));
-                    } else if (calc2) {
-                        double val = Double.parseDouble(text2);
-                        double result = val * toRate / fromRate;
-                        amountField1.setText(String.format("%.4f", result));
                     } else {
-                        StatusLabel.setText("Wpisz kwotę w jednym z pól.");
+                        StatusLabel.setText("Wpisz kwotę w pierwsze pole.");
                     }
                 } catch (Exception ex) {
                     StatusLabel.setText("Błąd przeliczenia: " + ex.getMessage());
                 }
             });
 
-            chartPanelContainer.setVisible(false);
+            initiateWindow(frame, topPanel, dataSourceComboBox, nbpCurrencyComboBox1, nbpCurrencyComboBox2, chartPanelContainer, StatusLabel);
 
             frame.setVisible(true);
         });
+    }
+    private static void initiateWindow(JFrame frame, JPanel topPanel,JComboBox<String> dataSourceComboBox, JComboBox<String> nbpCurrencyComboBox1,
+                                        JComboBox<String> nbpCurrencyComboBox2, JPanel chartPanelContainer, JLabel StatusLabel) {
+        // Ustawienia okna
+        frame.setTitle("Kantor - aplikacja do przeliczania walut");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(1400, 900);
+        frame.setLocationRelativeTo(null);
+        
+         for (ActionListener al: dataSourceComboBox.getActionListeners()) {
+            al.actionPerformed(new ActionEvent(dataSourceComboBox, ActionEvent.ACTION_PERFORMED, null));
+        }
+
     }
 
     private static void fetchNBPCurrencies(JComboBox<String> nbpCurrencyComboBox1, JLabel StatusLabel, JComboBox<String> nbpCurrencyComboBox2) {
@@ -256,37 +275,45 @@ public class App {
         }
     }
 
-    private static void fetchAndShowNBPCharts(String currencyCode, JPanel chartPanelContainer, JLabel statusLabel) {
+    private static void fetchAndShowNBPCharts(String currencyCode1, String currencyCode2, JPanel chartPanelContainer, JLabel statusLabel) {
         SwingUtilities.invokeLater(() -> {
             chartPanelContainer.removeAll();
             chartPanelContainer.setVisible(true);
             try {
-                DefaultCategoryDataset dataset30 = fetchNBPRatesDataset(currencyCode, 30);
-                JFreeChart chart30 = ChartFactory.createLineChart(
-                        "Kurs " + currencyCode + " (ostatnie 30 dni)", "Data", "Kurs", dataset30);
+                DefaultCategoryDataset dataset30_1 = fetchNBPRatesDataset(currencyCode1, 30);
+                JFreeChart chart30_1 = ChartFactory.createLineChart(
+                        "Kurs " + currencyCode1 + " (ostatnie 30 dni)", "Data", "Kurs", dataset30_1);
 
-                scaleYAxisToData(chart30, dataset30);
+                scaleYAxisToData(chart30_1, dataset30_1);
+                setXAxisDateFormat(chart30_1);
 
-                ChartPanel chartPanel30 = new ChartPanel(chart30);
+                ChartPanel chartPanel30_1 = new ChartPanel(chart30_1);
 
-                DefaultCategoryDataset dataset90 = fetchNBPRatesDataset(currencyCode, 90);
-                JFreeChart chart90 = ChartFactory.createLineChart(
-                        "Kurs " + currencyCode + " (ostatnie 90 dni)", "Data", "Kurs", dataset90);
+                DefaultCategoryDataset dataset30_2 = fetchNBPRatesDataset(currencyCode2, 30);
+                
+                JFreeChart chart30_2 = ChartFactory.createLineChart(
+                        "Kurs " + currencyCode2 + " (ostatnie 30 dni)", "Data", "Kurs", dataset30_2);
 
-                scaleYAxisToData(chart90, dataset90);
+                scaleYAxisToData(chart30_2, dataset30_2);
+                setXAxisDateFormat(chart30_2);
 
-                ChartPanel chartPanel90 = new ChartPanel(chart90);
+                ChartPanel chartPanel30_2 = new ChartPanel(chart30_2);
 
                 chartPanelContainer.setLayout(new GridLayout(1, 2));
-                chartPanelContainer.add(chartPanel30);
-                chartPanelContainer.add(chartPanel90);
+                chartPanelContainer.add(chartPanel30_1);
+                chartPanelContainer.add(chartPanel30_2);
                 chartPanelContainer.revalidate();
                 chartPanelContainer.repaint();
-                statusLabel.setText("Wykresy pobrane.");
+                statusLabel.setText("Kursy pobrane.");
             } catch (Exception ex) {
                 statusLabel.setText("Błąd pobierania wykresów: " + ex.getMessage());
             }
         });
+    }
+    private static void setXAxisDateFormat(JFreeChart chart) {
+        CategoryPlot plot = chart.getCategoryPlot();        
+        plot.getDomainAxis().setCategoryLabelPositions(
+                org.jfree.chart.axis.CategoryLabelPositions.createUpRotationLabelPositions(Math.PI / 6.0));
     }
 
     private static void scaleYAxisToData(JFreeChart chart, DefaultCategoryDataset dataset) {
@@ -310,6 +337,7 @@ public class App {
         NumberAxis yAxis = (NumberAxis) plot.getRangeAxis();
         yAxis.setRange(min - margin, max + margin);
     }
+
 
     private static DefaultCategoryDataset fetchNBPRatesDataset(String currencyCode, int days) throws Exception {
         URL url = new URL("https://api.nbp.pl/api/exchangerates/rates/A/" + currencyCode + "/last/" + days + "/?format=json");
@@ -342,8 +370,10 @@ public class App {
         }
     }
 
-    private static void fetchExchangeRates(String dataSource, JTextArea textArea) {
+    private static void fetchExchangeRates(String dataSource, JTextArea textArea, JLabel statusLabel) {
+        Cursor oldCursor = textArea.getCursor();
         try {
+            textArea.setCursor(Cursor.getPredefinedCursor(Cursor.WAIT_CURSOR));
             URL url;
             switch (dataSource) {
                 case "NBP":
@@ -389,17 +419,24 @@ public class App {
                         result = "Unknown data source.";
                 }
                 textArea.setText(result);
-                logger.info("Exchange rates fetched successfully from " + dataSource);
+                statusLabel.setText("Kursy pobrane z " + dataSource + ".");
+                logger.info("Kursy pobrane z " + dataSource);
             } else {
-                String errorMessage = "Error: " + con.getResponseCode() + " " + con.getResponseMessage();
+                String errorMessage = "Błąd: " + con.getResponseCode() + " " + con.getResponseMessage();
                 textArea.setText(errorMessage);
                 logger.error(errorMessage);
+                statusLabel.setText("Błąd pobierania kursów: " + con.getResponseCode() + " " + con.getResponseMessage());
             }
         } catch (Exception e) {
-            String errorMessage = "An error occurred: " + e.getMessage();
+            String errorMessage = "Błąd podczas pobierania kursów : " + e.getMessage();
             textArea.setText(errorMessage);
             logger.error(errorMessage, e);
         }
+        finally {
+            textArea.setCaretPosition(0); // Przewiń do góry
+            textArea.setCursor(oldCursor);
+        }
+
     }
 
     private static String parseNBPResponse(String jsonResponse) {
